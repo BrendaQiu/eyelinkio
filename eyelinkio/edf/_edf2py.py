@@ -9,6 +9,7 @@ from ctypes import (
     Union,
     c_char,
     c_char_p,
+    c_void_p,
     c_float,
     c_int,
     c_short,
@@ -16,6 +17,8 @@ from ctypes import (
     c_uint,
     c_ushort,
     util,
+    cast,
+    sizeof
 )
 
 # find and load the library
@@ -191,26 +194,40 @@ edf_get_revision.restype = c_int
 edf_get_eyelink_revision = edfapi.edf_get_eyelink_revision
 edf_get_eyelink_revision.argtypes = [POINTER(EDFFILE)]
 edf_get_eyelink_revision.restype = c_int
+"""
+
+def ReturnString(result, func, arguments):
+    """
+    Processes a return value from a C function that returns a string.
+
+    Parameters:
+        result: The raw return value from the C function (pointer to char).
+        func: The C function that was called (used for debugging/logging).
+        arguments: The arguments passed to the C function.
+
+    Returns:
+        A Python string converted from the C string.
+
+    Raises:
+        ValueError: If the result is a null pointer.
+    """
+    if not result:
+        raise ValueError(f"{func.__name__} returned NULL for arguments {arguments}")
+    
+    # Cast the result to a c_char_p to extract the string
+    string_pointer = cast(result, c_char_p)
+    return string_pointer.value.decode('utf-8')  # Decode to Python string
+
+class TRIAL(Structure):
+    pass
+
+TRIAL.__slots__ = ['rec', 'duration', 'starttime', 'endtime']
+TRIAL._fields_ = [('rec', POINTER(RECORDINGS)), ('duration', c_uint),
+                  ('starttime', c_uint), ('endtime', c_uint)]
 
 edf_set_trial_identifier = edfapi.edf_set_trial_identifier
-edf_set_trial_identifier.argtypes = [POINTER(EDFFILE), String, String]
+edf_set_trial_identifier.argtypes = [POINTER(EDFFILE), c_char_p, c_char_p]
 edf_set_trial_identifier.restype = c_int
-
-edf_get_start_trial_identifier = edfapi.edf_get_start_trial_identifier
-edf_get_start_trial_identifier.argtypes = [POINTER(EDFFILE)]
-if sizeof(c_int) == sizeof(c_void_p):
-    edf_get_start_trial_identifier.restype = ReturnString
-else:
-    edf_get_start_trial_identifier.restype = String
-    edf_get_start_trial_identifier.errcheck = ReturnString
-
-edf_get_end_trial_identifier = edfapi.edf_get_end_trial_identifier
-edf_get_end_trial_identifier.argtypes = [POINTER(EDFFILE)]
-if sizeof(c_int) == sizeof(c_void_p):
-    edf_get_end_trial_identifier.restype = ReturnString
-else:
-    edf_get_end_trial_identifier.restype = String
-    edf_get_end_trial_identifier.errcheck = ReturnString
 
 edf_get_trial_count = edfapi.edf_get_trial_count
 edf_get_trial_count.argtypes = [POINTER(EDFFILE)]
@@ -220,18 +237,26 @@ edf_jump_to_trial = edfapi.edf_jump_to_trial
 edf_jump_to_trial.argtypes = [POINTER(EDFFILE), c_int]
 edf_jump_to_trial.restype = c_int
 
-
-class TRIAL(Structure):
-    pass
-
-TRIAL.__slots__ = ['rec', 'duration', 'starttime', 'endtime']
-TRIAL._fields_ = [('rec', POINTER(RECORDINGS)), ('duration', c_uint),
-                  ('starttime', c_uint), ('endtime', c_uint)]
-
-
 edf_get_trial_header = edfapi.edf_get_trial_header
 edf_get_trial_header.argtypes = [POINTER(EDFFILE), POINTER(TRIAL)]
 edf_get_trial_header.restype = c_int
+
+"""
+edf_get_start_trial_identifier = edfapi.edf_get_start_trial_identifier
+edf_get_start_trial_identifier.argtypes = [POINTER(EDFFILE)]
+if sizeof(c_int) == sizeof(c_void_p):
+    edf_get_start_trial_identifier.restype = ReturnString
+else:
+    edf_get_start_trial_identifier.restype = c_char_p
+    edf_get_start_trial_identifier.errcheck = ReturnString
+
+edf_get_end_trial_identifier = edfapi.edf_get_end_trial_identifier
+edf_get_end_trial_identifier.argtypes = [POINTER(EDFFILE)]
+if sizeof(c_int) == sizeof(c_void_p):
+    edf_get_end_trial_identifier.restype = ReturnString
+else:
+    edf_get_end_trial_identifier.restype = c_char_p
+    edf_get_end_trial_identifier.errcheck = ReturnString
 
 edf_goto_previous_trial = edfapi.edf_goto_previous_trial
 edf_goto_previous_trial.argtypes = [POINTER(EDFFILE)]

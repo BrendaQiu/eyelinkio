@@ -19,6 +19,11 @@ try:
         edf_get_preamble_text_length,
         edf_get_version,
         edf_open_file,
+        edf_set_trial_identifier,
+        edf_get_trial_count,
+        edf_jump_to_trial,
+        edf_get_trial_header,
+        TRIAL
     )
 
     has_edfapi = True
@@ -177,7 +182,36 @@ def _read_raw_edf(fname):
             ets = event_constants[etype]
             if ets in _ets2pp:
                 n_samps[_ets2pp[ets]] += 1
+                
+        # set trial identifiers
+        if edf_set_trial_identifier(edf, b"TRIALID", b"TRIALID") != 0:
+            raise RuntimeError("Failed to set trial identifiers")
+        
+        # get trial count
+        trial_count = edf_get_trial_count(edf)
 
+        if trial_count < 0:
+            raise RuntimeError("Failed to get trial count")
+        
+        # prepare trial storage
+        trial_dtype = [("stime", np.float64), ("etime", np.float64), ("index", np.int32)]
+        trials = []
+        
+        # initalize trial object
+        trial = TRIAL()
+        
+        for trial_index in range(trial_count):
+            if edf_jump_to_trial(edf, trial_index) != 0:
+                raise RuntimeError(f"Failed to jump to trial {trial_index}")
+            
+            if edf_get_trial_header(edf, ct.byref(trial)) != 0:
+                raise RuntimeError(f"Failed to get trial header for trial {trial_index}")
+            
+            # append trial start and end times and index to trials list
+            trials.append((trial.starttime, trial.endtime, trial_index))   
+
+        trials = np.array(trials, dtype=trial_dtype)
+        
     #
     # Now let's actually read in the data
     #
@@ -204,13 +238,16 @@ def _read_raw_edf(fname):
             ets = event_constants[etype]
             _element_handlers[ets](edf, res)
         _element_handlers["VERSION"](res)
+        
+        # add trials to discrete
+        res["discrete"]["trials"] = trials
 
     #
     # Put info and discrete into correct output format
     #
     discrete = res["discrete"]
     info = res["info"]
-    event_types = ("saccades", "fixations", "blinks", "buttons", "inputs", "messages")
+    event_types = ("saccades", "fixations", "blinks", "buttons", "inputs", "messages", "trials")
     info["sample_fields"] = info["sample_fields"][1:]  # omit time
 
     #
