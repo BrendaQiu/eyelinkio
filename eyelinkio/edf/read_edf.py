@@ -182,9 +182,9 @@ def _read_raw_edf(fname):
             ets = event_constants[etype]
             if ets in _ets2pp:
                 n_samps[_ets2pp[ets]] += 1
-                
+
         # set trial identifiers
-        if edf_set_trial_identifier(edf, b"TRIALID", b"TRIALID") != 0:
+        if edf_set_trial_identifier(edf, b"START", b"END") != 0:
             raise RuntimeError("Failed to set trial identifiers")
         
         # get trial count
@@ -194,7 +194,7 @@ def _read_raw_edf(fname):
             raise RuntimeError("Failed to get trial count")
         
         # prepare trial storage
-        trial_dtype = [("stime", np.float64), ("etime", np.float64), ("index", np.int32)]
+        trial_dtype = [("stime", np.float64), ("etime", np.float64)]
         trials = []
         
         # initalize trial object
@@ -208,7 +208,7 @@ def _read_raw_edf(fname):
                 raise RuntimeError(f"Failed to get trial header for trial {trial_index}")
             
             # append trial start and end times and index to trials list
-            trials.append((trial.starttime, trial.endtime, trial_index))   
+            trials.append((trial.starttime, trial.endtime))   
 
         trials = np.array(trials, dtype=trial_dtype)
         
